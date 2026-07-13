@@ -85,6 +85,43 @@ components:
       - name: wait-for-postgresql
         image: busybox:latest
         command: ["sh", "-c", "until nc -z -v -w30 postgresql 5432; do echo waiting for postgresql; sleep 2; done;"]
+    envOverrides:
+      - name: OTEL_CONFIG_FILE
+        value: /otel-config.yml
+    mountedConfigMaps:
+      - name: product-catalog-otel-config
+        mountPath: /otel-config.yml
+        subPath: otel-config.yml
+        data:
+          otel-config.yml: |
+            file_format: "1.0"
+            disabled: false
+            logger_provider:
+              processors:
+                - batch:
+                    exporter:
+                      otlp_grpc:
+                        endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT}
+            meter_provider:
+              readers:
+                - periodic:
+                    exporter:
+                      otlp_grpc:
+                        endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT}
+                        temporality_preference: ${OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE:-cumulative}
+            tracer_provider:
+              processors:
+                - batch:
+                    exporter:
+                      otlp_grpc:
+                        endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT}
+            propagator:
+              composite:
+                - tracecontext:
+                - baggage:
+            resource:
+              attributes_list: ${OTEL_RESOURCE_ATTRIBUTES}
+
   llm:
     enabled: false
   product-reviews:
